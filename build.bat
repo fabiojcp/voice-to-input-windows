@@ -5,20 +5,34 @@ echo ============================================
 echo.
 
 REM Check if Python is available
-python --version >nul 2>&1
+py --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERRO] Python nao encontrado. Instale o Python 3.11+.
     pause
     exit /b 1
 )
 
+echo [0/3] Verificando Visual C++ Build Tools...
+where cl.exe >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [AVISO] Visual C++ Build Tools nao encontrado.
+    echo Baixe em: https://visualstudio.microsoft.com/visual-cpp-build-tools/
+    echo Se o build falhar, instale as ferramentas e execute novamente.
+    echo.
+)
+
 echo [1/3] Instalando dependencias...
-pip install -r requirements.txt
-pip install pyinstaller
+py -m pip install -r requirements.txt
+if %errorlevel% neq 0 (
+    echo [ERRO] Falha ao instalar dependencias.
+    pause
+    exit /b 1
+)
+py -m pip install pyinstaller
 
 echo.
 echo [2/3] Gerando executavel...
-pyinstaller ^
+py -m PyInstaller ^
     --onefile ^
     --noconsole ^
     --name="VoiceToInput" ^
