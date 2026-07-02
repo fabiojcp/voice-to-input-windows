@@ -18,6 +18,9 @@ import threading
 from pathlib import Path
 from typing import Optional
 
+import ctypes
+from ctypes import wintypes
+
 from config import AppConfig, load_config, save_config
 from recorder import AudioRecorder
 from transcriber import Transcriber
@@ -26,6 +29,43 @@ from hotkeys import HotkeyManager
 from autostart import enable_autostart, disable_autostart, is_autostart_enabled
 
 logger = logging.getLogger(__name__)
+
+IDC_ARROW = 32512
+IDC_CROSS = 32515
+OCR_NORMAL = 32512
+
+_user32 = ctypes.windll.user32
+_original_arrow_cursor: Optional[int] = None
+_cursor_changed: bool = False
+
+
+def _set_cursor_recording() -> None:
+    global _cursor_changed, _original_arrow_cursor
+    if _cursor_changed:
+        return
+    try:
+        _original_arrow_cursor = _user32.CopyIcon(
+            _user32.LoadCursorW(None, IDC_ARROW)
+        )
+        recording_cursor = _user32.LoadCursorW(None, IDC_CROSS)
+        _user32.SetSystemCursor(recording_cursor, OCR_NORMAL)
+        _cursor_changed = True
+        logger.debug("Cursor changed to recording indicator")
+    except Exception as exc:
+        logger.warning("Failed to change cursor: %s", exc)
+
+
+def _restore_cursor() -> None:
+    global _cursor_changed, _original_arrow_cursor
+    if not _cursor_changed or _original_arrow_cursor is None:
+        return
+    try:
+        _user32.SetSystemCursor(_original_arrow_cursor, OCR_NORMAL)
+        _cursor_changed = False
+        _original_arrow_cursor = None
+        logger.debug("Cursor restored to default")
+    except Exception as exc:
+        logger.warning("Failed to restore cursor: %s", exc)
 
 
 class VoiceToInputApp:
@@ -52,6 +92,7 @@ class VoiceToInputApp:
         logger.info("Hotkey pressed - starting recording")
         try:
             self._recorder.start()
+            _set_cursor_recording()
         except Exception as exc:
             print(f"[ERRO] Falha ao iniciar gravação: {exc}")
             logger.exception("Failed to start recording")
@@ -60,6 +101,7 @@ class VoiceToInputApp:
         print("[Transcrevendo...]")
         logger.info("Hotkey pressed - stopping recording and transcribing")
 
+        _restore_cursor()
         audio = self._recorder.stop()
         if audio.size == 0:
             print("[ERRO] Nenhum áudio capturado.")
@@ -149,6 +191,7 @@ class VoiceToInputApp:
             logger.warning("Failed to create tray icon: %s", exc)
 
     def shutdown(self) -> None:
+        _restore_cursor()
         self._hotkeys.unregister()
         logger.info("Shutdown complete")
 
