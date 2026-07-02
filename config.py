@@ -3,15 +3,22 @@
 from __future__ import annotations
 
 import json
-import os
 import logging
+import sys
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONFIG_PATH = Path(__file__).parent / "config.json"
+
+def _get_app_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).parent
+    return Path(__file__).parent
+
+
+DEFAULT_CONFIG_PATH = _get_app_dir() / "config.json"
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "model": {
